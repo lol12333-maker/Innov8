@@ -1,22 +1,17 @@
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'booking.db');
-
-// Ensure data directory exists
-const fs = require('fs');
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(DB_PATH);
-
-// Enable WAL mode for better concurrent reads
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-// ─── Schema ───────────────────────────────────────────────────────────────────
+const db = new DatabaseSync(DB_PATH);
 
 db.exec(`
+  PRAGMA journal_mode = WAL;
+  PRAGMA foreign_keys = ON;
+
   CREATE TABLE IF NOT EXISTS users (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
@@ -31,22 +26,22 @@ db.exec(`
     name         TEXT NOT NULL,
     type         TEXT NOT NULL CHECK(type IN ('lab','seminar_hall','auditorium','classroom')),
     capacity     INTEGER NOT NULL,
-    facilities   TEXT NOT NULL DEFAULT '[]',   -- JSON array of strings
-    needs_approval INTEGER NOT NULL DEFAULT 0, -- 1 = requires incharge approval
+    facilities   TEXT NOT NULL DEFAULT '[]',
+    needs_approval INTEGER NOT NULL DEFAULT 0,
     incharge_id  TEXT REFERENCES users(id),
     is_active    INTEGER NOT NULL DEFAULT 1,
     created_at   TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS timetable (
-    id         TEXT PRIMARY KEY,
-    room_id    TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-    day_of_week INTEGER NOT NULL,  -- 0=Sun, 1=Mon, ... 6=Sat
-    start_time  TEXT NOT NULL,     -- "HH:MM"
-    end_time    TEXT NOT NULL,     -- "HH:MM"
-    subject     TEXT NOT NULL,
+    id           TEXT PRIMARY KEY,
+    room_id      TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    day_of_week  INTEGER NOT NULL,
+    start_time   TEXT NOT NULL,
+    end_time     TEXT NOT NULL,
+    subject      TEXT NOT NULL,
     faculty_name TEXT NOT NULL,
-    created_at  TEXT DEFAULT (datetime('now'))
+    created_at   TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS bookings (
@@ -55,9 +50,9 @@ db.exec(`
     user_id      TEXT NOT NULL REFERENCES users(id),
     title        TEXT NOT NULL,
     description  TEXT,
-    date         TEXT NOT NULL,    -- "YYYY-MM-DD"
-    start_time   TEXT NOT NULL,    -- "HH:MM"
-    end_time     TEXT NOT NULL,    -- "HH:MM"
+    date         TEXT NOT NULL,
+    start_time   TEXT NOT NULL,
+    end_time     TEXT NOT NULL,
     attendees    INTEGER NOT NULL DEFAULT 1,
     status       TEXT NOT NULL DEFAULT 'pending'
                    CHECK(status IN ('pending','approved','rejected','cancelled')),
